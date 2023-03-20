@@ -1,7 +1,7 @@
 
 
 
-SAMPLES = ["MCL1-DG", "MCL1-DH"]
+SAMPLES = ["MCL1-DG", "MCL1-DH", "MCL1-DI", "MCL1-DJ","MCL1-DK","MCL1-DL","MCL1-LA","MCL1-LB","MCL1-LC","MCL1-LD","MCL1-LE","MCL1-LF"]
 
 rule fastqc:
     input:
@@ -50,7 +50,8 @@ rule hisat2:
         "data/dataset1/pipeline/04hisat2/{sample}.bam"
     params:
         i  = "pipeline/03trimmomatic/{sample}.fastqsanger.gz",
-        o = "pipeline/04hisat2/{sample}" 
+        o = "pipeline/04hisat2/{sample}"
+    threads: 1
     shell:
         """
             docker run --rm -v ./data/dataset1/:/data  app-bio/hisat2  hisat2  -x /data/ref-gene/hisat2-index-GRCm39/GRCm39  -U {params.i} -S {params.o}.sam 
@@ -64,12 +65,17 @@ rule hisat2_all:
 
 rule geneCount:
     input:
-        expand("data/dataset1/pipeline/04hisat2/{sample}.bam", sample = SAMPLES)
+        "data/dataset1/pipeline/04hisat2/{sample}.bam"
     output:
-        "data/dataset1/pipeline/05geneCount/geneCounts.txt"
+        "data/dataset1/pipeline/05geneCount/{sample}.geneCounts.txt"
     params:
-        i  =  expand("pipeline/04hisat2/{sample}.bam", sample =SAMPLES),
-        o = "pipeline/05geneCounts/geneCounts.txt",
-        r = "ref-gene/genomic.gtf"
+        i  = "pipeline/04hisat2/{sample}.bam",
+        o = "pipeline/05geneCount/{sample}.geneCounts.txt",
+        r = "ref-gene/genomic.gff"
     shell:
         "docker run --rm -v ./data/dataset1/:/data  app-bio/subread featureCounts -a {params.r} -t exon -g gene_id -o {params.o} {params.i} "
+
+rule geneCount_all:
+    input:
+        counts = expand("data/dataset1/pipeline/05geneCount/{sample}.geneCounts.txt", sample=SAMPLES),
+        mqc1 = "data/dataset1/pipeline/02multiqc/multiqc_report.html"
