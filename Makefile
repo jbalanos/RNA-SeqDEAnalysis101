@@ -10,7 +10,7 @@ APP_NAME = "rna-seq
 
 
 repository ?= app-bio
-images = base Fastqc MultiQc Trimmomatic
+images = base base-java fastqc base-python multiqc trimmomatic hisat2 samtools subread
 
 
 
@@ -71,3 +71,7 @@ download-samples-raw:
 		wget  --limit-rate=500k -b -P data/raw/samples/ https://zenodo.org/record/4541751/files/GSM461177_2.fastqsanger
 		wget  --limit-rate=500k -b -P data/raw/samples/ https://zenodo.org/record/4541751/files/GSM461180_1.fastqsanger
 		wget  --limit-rate=500k -b -P data/raw/samples/ https://zenodo.org/record/4541751/files/GSM461180_2.fastqsanger
+
+
+duild-hisat2-ref-gene-index:
+		docker run --rm -v ./data/dataset1/:/data  app-bio/hisat2 hisat2-build -p 6  -f /data/ref-gene/GCF_000001635.27_GRCm39_genomic.fna  /data/ref-gene/hisat2-index-GRCm39/GRCm39

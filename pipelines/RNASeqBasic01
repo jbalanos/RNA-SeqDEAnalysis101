@@ -1,0 +1,75 @@
+
+
+
+SAMPLES = ["MCL1-DG", "MCL1-DH"]
+
+rule fastqc:
+    input:
+        expand("data/dataset1/raw-samples/{sample}.fastqsanger.gz",sample = SAMPLES)
+    output:
+        report = expand("data/dataset1/pipeline/01fastqc/{sample}.fastqsanger_fastqc.html",sample = SAMPLES),
+        dataa =  expand("data/dataset1/pipeline/01fastqc/{sample}.fastqsanger_fastqc.zip", sample = SAMPLES),
+    params:
+        i  = ["raw-samples/{sample}.fastqsanger.gz".format(sample=sample) for sample in SAMPLES],
+        o = "pipeline/01fastqc/"
+    shell:
+        "docker run --rm -v ./data/dataset1/:/data  app-bio/fastqc  fastqc -t 5 -o  {params.o} {params.i}"
+
+
+
+rule multiqc:
+    input:
+        expand("data/dataset1/pipeline/01fastqc/{sample}.fastqsanger_fastqc.html",sample = SAMPLES)
+    output:
+        "data/dataset1/pipeline/02multiqc/multiqc_report.html"
+    params:
+        i = "pipeline/01fastqc",
+        o = "pipeline/02multiqc/"
+    shell:
+        "docker run --rm -v ./data/dataset1/:/data  app-bio/multiqc multiqc  {params.i} -o {params.o}"
+
+rule trimmomatic:
+    input:
+        "data/dataset1/raw-samples/{sample}.fastqsanger.gz"
+    output:
+        "data/dataset1/pipeline/03trimmomatic/{sample}.fastqsanger.gz"
+    params:
+        i  = "raw-samples/{sample}.fastqsanger.gz",
+        o = "pipeline/03trimmomatic/{sample}.fastqsanger.gz" 
+    shell:
+        "docker run --rm -v ./data/dataset1/:/data  app-bio/trimmomatic  TrimmomaticSE -threads 4  -trimlog pipeline/03trimmomatic/trim.log  {params.i} {params.o} SLIDINGWINDOW:4:20 "
+
+rule trimmomatic_all:
+    input:
+        expand("data/dataset1/pipeline/03trimmomatic/{sample}.fastqsanger.gz", sample=SAMPLES)
+
+rule hisat2:
+    input:
+        "data/dataset1/pipeline/03trimmomatic/{sample}.fastqsanger.gz"
+    output:
+        "data/dataset1/pipeline/04hisat2/{sample}.bam"
+    params:
+        i  = "pipeline/03trimmomatic/{sample}.fastqsanger.gz",
+        o = "pipeline/04hisat2/{sample}" 
+    shell:
+        """
+            docker run --rm -v ./data/dataset1/:/data  app-bio/hisat2  hisat2  -x /data/ref-gene/hisat2-index-GRCm39/GRCm39  -U {params.i} -S {params.o}.sam 
+            docker run --rm -v ./data/dataset1/:/data  app-bio/samtools  sh -c "samtools view -bS {params.o}.sam  > {params.o}.bam"
+        """
+
+rule hisat2_all:
+    input:
+        expand("data/dataset1/pipeline/04hisat2/{sample}.bam", sample=SAMPLES)
+
+
+rule geneCount:
+    input:
+        expand("data/dataset1/pipeline/04hisat2/{sample}.bam", sample = SAMPLES)
+    output:
+        "data/dataset1/pipeline/05geneCount/geneCounts.txt"
+    params:
+        i  =  expand("pipeline/04hisat2/{sample}.bam", sample =SAMPLES),
+        o = "pipeline/05geneCounts/geneCounts.txt",
+        r = "ref-gene/genomic.gtf"
+    shell:
+        "docker run --rm -v ./data/dataset1/:/data  app-bio/subread featureCounts -a {params.r} -t exon -g gene_id -o {params.o} {params.i} "
